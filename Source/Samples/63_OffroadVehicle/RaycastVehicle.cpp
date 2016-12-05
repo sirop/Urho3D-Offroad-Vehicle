@@ -87,18 +87,13 @@ void RaycastVehicle::AddBodyToWorld()
 
 void RaycastVehicle::SetVehicleCenterOfMass(const Vector3 &centerOfMass)
 {
-    // set the added shape index
-    if ( indexAddedShape_ == -1 )
-    {
-        indexAddedShape_ = GetCompoundShape()->getNumChildShapes() + 1;
-    }
-
-    if (GetCompoundShape()->getNumChildShapes() < indexAddedShape_)
+    if (sphShape_ == NULL)
     {
         // compound shape
         btTransform transf;
         transf.setIdentity();
         sphShape_ = new btSphereShape(0.2f);
+        indexAddedShape_ = GetCompoundShape()->getNumChildShapes() ;
 
         // rigid body's center of mass = avg(sum of all compound positions) // size and mass are irrelevant
         vehicleCenterOfMass_ = centerOfMass;
