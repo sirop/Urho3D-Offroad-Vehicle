@@ -78,6 +78,7 @@ public:
 
     /// Handle physics world update. Called by LogicComponent base class.
     virtual void FixedUpdate(float timeStep);
+    void FixedPostUpdate(float timeStep);
     virtual void PostUpdate(float timeStep);
    
     void ResetForces()

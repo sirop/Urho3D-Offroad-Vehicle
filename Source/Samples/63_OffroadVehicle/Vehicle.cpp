@@ -72,7 +72,7 @@ Vehicle::Vehicle(Context* context)
     , steering_( 0.0f )
 {
     // fixed update() for inputs and post update() to sync wheels for rendering
-    SetUpdateEventMask( USE_FIXEDUPDATE | USE_POSTUPDATE );
+    SetUpdateEventMask( USE_FIXEDUPDATE | USE_FIXEDPOSTUPDATE| USE_POSTUPDATE );
 
     m_fVehicleMass = 100.0f;
     m_fEngineForce = 0.0f;
@@ -304,6 +304,7 @@ void Vehicle::Init()
 }
 
 //=============================================================================
+// physics tick
 //=============================================================================
 void Vehicle::FixedUpdate(float timeStep)
 {
@@ -326,7 +327,7 @@ void Vehicle::FixedUpdate(float timeStep)
         accelerator = 0.0f;
     }
 
-    if ( newSteering != 0.0f || accelerator != 0.0f )
+    if ( newSteering != 0.0f || accelerator != 0.0f || numWheelContacts_ == 0 )
     {
         raycastVehicle_->Activate();
     }
@@ -354,9 +355,9 @@ void Vehicle::FixedUpdate(float timeStep)
 }
 
 //=============================================================================
-// sync wheels for rendering
+// physics tick
 //=============================================================================
-void Vehicle::PostUpdate(float timeStep)
+void Vehicle::FixedPostUpdate(float timeStep)
 {
     float curSpdMph = GetSpeedMPH();
 
@@ -369,24 +370,91 @@ void Vehicle::PostUpdate(float timeStep)
         btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo( i );
 
         // adjust wheel rotation based on acceleration
-        if ( curGearIdx_ == 0 && currentAcceleration_ > 0.0f )
+        if ( (curGearIdx_ == 0 || !whInfo.m_raycastInfo.m_isInContact ) && currentAcceleration_ > 0.0f )
         {
             if ( whInfo.m_skidInfoCumulative > 0.05f )
             {
                 whInfo.m_skidInfoCumulative -= 0.002f;
             }
+
             float deltaRotation = (gearShiftSpeed_[curGearIdx_] * (1.0f - whInfo.m_skidInfoCumulative) * timeStep) / (whInfo.m_wheelsRadius);
 
             if ( deltaRotation > whInfo.m_deltaRotation )
             {
+                whInfo.m_rotation += deltaRotation - whInfo.m_deltaRotation;
                 whInfo.m_deltaRotation = deltaRotation;
-                whInfo.m_rotation += whInfo.m_deltaRotation;
             }
         }
         else
         {
             whInfo.m_skidInfoCumulative = whInfo.m_skidInfo;
+
+            if (!whInfo.m_raycastInfo.m_isInContact && currentAcceleration_ < M_EPSILON)
+            {
+                whInfo.m_rotation *= 0.95f;
+                whInfo.m_deltaRotation *= 0.95f;
+            }
         }
+
+        // ground contact
+        if ( whInfo.m_raycastInfo.m_isInContact )
+        {
+            numWheelContacts_++;
+        }
+    }
+
+    // find avg of wheel velocity/rmp
+    const float hullLinVelocity = raycastVehicle_->GetLinearVelocity().Length();
+    int numPoweredWheels = raycastVehicle_->GetNumWheels();
+    float wheelVelocity = 0.0f;
+
+    for ( int i = 0; i < numPoweredWheels; ++i )
+    {
+        const btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo(i);
+
+        // wheel velocity from rotation
+        // note (correct eqn): raycastVehicle_->GetLinearVelocity().Length() ~= whInfo.m_deltaRotation * whInfo.m_wheelsRadius)/timeStep
+        wheelVelocity += (whInfo.m_deltaRotation * whInfo.m_wheelsRadius)/timeStep;
+    }
+
+    // adjust rpm based on wheel speed
+    if (curGearIdx_ == 0 || numWheelContacts_ == 0)
+    {
+        // average wheel velocity
+        wheelVelocity /= (float)numPoweredWheels;
+
+        // physics velocity to kmh to mph (based on Bullet's calculation for KmH)
+        wheelVelocity = wheelVelocity * 3.6f * KMH_TO_MPH;
+        float wheelRPM = upShiftRPM_ * wheelVelocity / gearShiftSpeed_[curGearIdx_];
+
+        if (wheelRPM > upShiftRPM_*0.75f)
+        {
+            if ( curGearIdx_ == 0 )
+            {
+                wheelRPM = upShiftRPM_ * Random(0.7f, 0.75f);
+            }
+            else
+            {
+                wheelRPM = upShiftRPM_* Random(0.74f, 0.75f);
+            }
+        }
+        if ( wheelRPM > curRPM_ ) 
+            curRPM_ = wheelRPM;
+        if ( curRPM_ < MIN_IDLE_RPM ) 
+            curRPM_ += minIdleRPM_;
+    }
+}
+
+//=============================================================================
+// sync wheels for rendering - scene frame rate
+//=============================================================================
+void Vehicle::PostUpdate(float timeStep)
+{
+    float curSpdMph = GetSpeedMPH();
+
+    for ( int i = 0; i < raycastVehicle_->GetNumWheels(); i++ )
+    {
+        btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo( i );
 
         // update wheel transform - performed after whInfo.m_rotation is adjusted from above
         raycastVehicle_->UpdateWheelTransform( i, true );
@@ -400,12 +468,6 @@ void Vehicle::PostUpdate(float timeStep)
         Vector3 v3PosLS = ToVector3( whInfo.m_chassisConnectionPointCS );
         Quaternion qRotator = ( v3PosLS.x_ >= 0.0 ? Quaternion(0.0f, 0.0f, -90.0f) : Quaternion(0.0f, 0.0f, 90.0f) );
         pWheel->SetRotation( qRot * qRotator );
-
-        // ground contact
-        if ( whInfo.m_raycastInfo.m_isInContact )
-        {
-            numWheelContacts_++;
-        }
     }
 
     // update sound and wheel effects
@@ -643,19 +705,12 @@ void Vehicle::UpdateDrift()
 
 void Vehicle::PostUpdateSound(float timeStep)
 {
-    const float hullLinVelocity = raycastVehicle_->GetLinearVelocity().Length();
-    float wheelVelocity = 0.0f;
-    int numPoweredWheels = raycastVehicle_->GetNumWheels();
     int playSkidSound = 0;
 
-    for ( int i = 0; i < numPoweredWheels; ++i )
+    for ( int i = 0; i < numWheels_; ++i )
     {
         const btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo(i);
 
-        // wheel velocity from rotation
-        // note: raycastVehicle_->GetLinearVelocity().Length() ~= (whInfo.m_deltaRotation * whInfo.m_wheelsRadius)/(M_PI*timeStep)
-        wheelVelocity += (whInfo.m_deltaRotation * whInfo.m_wheelsRadius)/((float)M_PI * timeStep);
-        
         // skid sound
         if ( whInfo.m_raycastInfo.m_isInContact )
         {
@@ -671,23 +726,6 @@ void Vehicle::PostUpdateSound(float timeStep)
     // -if shifting rmps sounds off then change the normalization value. for the engine prototype sound, 
     // the pitch sound is low, so it's normalized by diving by 8k instead of 10k
     const float rpmNormalizedForEnginePrototype = 8000.0f;
-
-    // adjust rpm based on wheel speed
-    if (curGearIdx_ == 0 || numWheelContacts_ == 0)
-    {
-        // average wheel velocity
-        wheelVelocity /= (float)numPoweredWheels;
-
-        // physics velocity to kmh to mph (based on Bullet's calculation for KmH)
-        wheelVelocity = wheelVelocity * 3.6f * KMH_TO_MPH;
-        float wheelRPM = upShiftRPM_ * wheelVelocity / gearShiftSpeed_[curGearIdx_];
-
-        if ( wheelRPM > curRPM_ && wheelRPM < upShiftRPM_) 
-            curRPM_ = wheelRPM;
-        if ( curRPM_ < MIN_IDLE_RPM ) 
-            curRPM_ += minIdleRPM_;
-    }
-
     engineSoundSrc_->SetFrequency(AUDIO_FIXED_FREQ_44K * curRPM_/rpmNormalizedForEnginePrototype);
 
     // shock impact when transitioning from partially off ground (or air borne) to landing
