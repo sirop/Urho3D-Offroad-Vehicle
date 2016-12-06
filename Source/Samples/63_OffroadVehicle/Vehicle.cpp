@@ -63,6 +63,7 @@
 #define AUDIO_FIXED_FREQ_44K    44100.0f
 #define MIN_SHOCK_IMPACT_VEL    3.0f
 #define MAX_SKID_TRACK_SPEED    70.0f
+#define MIN_SIDE_SLIP_VEL       4.0f
 
 //=============================================================================
 //=============================================================================
@@ -696,7 +697,10 @@ void Vehicle::PostUpdateSound(float timeStep)
 
         if ( f3DownLinVel > MIN_SHOCK_IMPACT_VEL )
         {
-            shockSoundSrc_->Play(shockSnd_);
+            if ( !shockSoundSrc_->IsPlaying() )
+            {
+                shockSoundSrc_->Play(shockSnd_);
+            }
         }
     }
 
@@ -717,16 +721,24 @@ void Vehicle::PostUpdateSound(float timeStep)
 void Vehicle::PostUpdateWheelEffects()
 {
     float curSpdMph = GetSpeedMPH();
+    Vector3 linVel = raycastVehicle_->GetLinearVelocity();
 
-    for ( int i = 0; i < raycastVehicle_->GetNumWheels(); i++ )
+    for ( int i = 0; i < raycastVehicle_->GetNumWheels(); ++i )
     {
         const btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo( i );
+
+        // bullet's raycastvehicle doesn't seem to detect side velocity as slip
+        float rdot = 0.0f;
+        if ( whInfo.m_raycastInfo.m_isInContact )
+        {
+            rdot = Abs(ToVector3(whInfo.m_raycastInfo.m_wheelAxleWS).DotProduct(linVel));
+        }
 
         // wheel skid track and particles
         wheelTrackList_[i]->UpdateWorldPos();
         ParticleEmitter *particleEmitter = particleEmitterNodeList_[i]->GetComponent<ParticleEmitter>();
 
-        if ( whInfo.m_raycastInfo.m_isInContact && whInfo.m_skidInfoCumulative < 0.9f)
+        if ( whInfo.m_raycastInfo.m_isInContact && ( whInfo.m_skidInfoCumulative < 0.9f || rdot > MIN_SIDE_SLIP_VEL) )
         {
             Vector3 pos2 = ToVector3(whInfo.m_raycastInfo.m_contactPointWS);
             particleEmitterNodeList_[i]->SetPosition(pos2);
