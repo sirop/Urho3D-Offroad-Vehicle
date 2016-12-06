@@ -327,7 +327,7 @@ void Vehicle::FixedUpdate(float timeStep)
         accelerator = 0.0f;
     }
 
-    if ( newSteering != 0.0f || accelerator != 0.0f || numWheelContacts_ == 0 )
+    if ( newSteering != 0.0f || accelerator != 0.0f )
     {
         raycastVehicle_->Activate();
     }
