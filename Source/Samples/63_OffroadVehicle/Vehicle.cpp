@@ -65,6 +65,11 @@
 #define MAX_SKID_TRACK_SPEED    70.0f
 #define MIN_SIDE_SLIP_VEL       4.0f
 
+#define MIN_WHEEL_RPM           0.60f
+#define MAX_WHEEL_RPM           0.75f
+#define MIN_WHEEL_RPM_AIR       0.89f
+#define MAX_WHEEL_RPM_AIR       0.90f
+
 //=============================================================================
 //=============================================================================
 Vehicle::Vehicle(Context* context)
@@ -364,6 +369,8 @@ void Vehicle::FixedPostUpdate(float timeStep)
     // clear contact states
     prevWheelContacts_ = numWheelContacts_;
     numWheelContacts_ = 0;
+    float wheelVelocity = 0.0f;
+    Vector3 linVel = raycastVehicle_->GetLinearVelocity();
 
     for ( int i = 0; i < raycastVehicle_->GetNumWheels(); i++ )
     {
@@ -397,25 +404,27 @@ void Vehicle::FixedPostUpdate(float timeStep)
         }
 
         // ground contact
+        float whSlipVel = 0.0f;
         if ( whInfo.m_raycastInfo.m_isInContact )
         {
             numWheelContacts_++;
+
+            // check side velocity slip
+            whSlipVel = Abs(ToVector3(whInfo.m_raycastInfo.m_wheelAxleWS).DotProduct(linVel));
+
+            if ( whSlipVel > MIN_SIDE_SLIP_VEL )
+            {
+                whInfo.m_skidInfoCumulative = (whInfo.m_skidInfoCumulative > 0.9f)?0.89f:whInfo.m_skidInfoCumulative;
+            }
         }
-    }
-
-    // find avg of wheel velocity/rmp
-    const float hullLinVelocity = raycastVehicle_->GetLinearVelocity().Length();
-    int numPoweredWheels = raycastVehicle_->GetNumWheels();
-    float wheelVelocity = 0.0f;
-
-    for ( int i = 0; i < numPoweredWheels; ++i )
-    {
-        const btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo(i);
 
         // wheel velocity from rotation
         // note (correct eqn): raycastVehicle_->GetLinearVelocity().Length() ~= whInfo.m_deltaRotation * whInfo.m_wheelsRadius)/timeStep
         wheelVelocity += (whInfo.m_deltaRotation * whInfo.m_wheelsRadius)/timeStep;
     }
+
+    // set cur rpm based on wheel rpm
+    int numPoweredWheels = raycastVehicle_->GetNumWheels();
 
     // adjust rpm based on wheel speed
     if (curGearIdx_ == 0 || numWheelContacts_ == 0)
@@ -427,19 +436,24 @@ void Vehicle::FixedPostUpdate(float timeStep)
         wheelVelocity = wheelVelocity * 3.6f * KMH_TO_MPH;
         float wheelRPM = upShiftRPM_ * wheelVelocity / gearShiftSpeed_[curGearIdx_];
 
-        if (wheelRPM > upShiftRPM_*0.75f)
+        if (curGearIdx_ == 0)
         {
-            if ( curGearIdx_ == 0 )
+            if ( wheelRPM > upShiftRPM_ * MAX_WHEEL_RPM )
             {
-                wheelRPM = upShiftRPM_ * Random(0.7f, 0.75f);
-            }
-            else
-            {
-                wheelRPM = upShiftRPM_* Random(0.74f, 0.75f);
+                wheelRPM = upShiftRPM_ * Random(MIN_WHEEL_RPM, MAX_WHEEL_RPM);
             }
         }
+        else
+        {
+            if ( wheelRPM > upShiftRPM_ * MAX_WHEEL_RPM_AIR )
+            {
+                wheelRPM = upShiftRPM_ * Random(MIN_WHEEL_RPM_AIR, MAX_WHEEL_RPM_AIR);
+            }
+        }
+
         if ( wheelRPM > curRPM_ ) 
             curRPM_ = wheelRPM;
+
         if ( curRPM_ < MIN_IDLE_RPM ) 
             curRPM_ += minIdleRPM_;
     }
@@ -765,18 +779,11 @@ void Vehicle::PostUpdateWheelEffects()
     {
         const btWheelInfo &whInfo = raycastVehicle_->GetWheelInfo( i );
 
-        // bullet's raycastvehicle doesn't seem to detect side velocity as slip
-        float rdot = 0.0f;
-        if ( whInfo.m_raycastInfo.m_isInContact )
-        {
-            rdot = Abs(ToVector3(whInfo.m_raycastInfo.m_wheelAxleWS).DotProduct(linVel));
-        }
-
         // wheel skid track and particles
         wheelTrackList_[i]->UpdateWorldPos();
         ParticleEmitter *particleEmitter = particleEmitterNodeList_[i]->GetComponent<ParticleEmitter>();
 
-        if ( whInfo.m_raycastInfo.m_isInContact && ( whInfo.m_skidInfoCumulative < 0.9f || rdot > MIN_SIDE_SLIP_VEL) )
+        if ( whInfo.m_raycastInfo.m_isInContact && whInfo.m_skidInfoCumulative < 0.9f )
         {
             Vector3 pos2 = ToVector3(whInfo.m_raycastInfo.m_contactPointWS);
             particleEmitterNodeList_[i]->SetPosition(pos2);
