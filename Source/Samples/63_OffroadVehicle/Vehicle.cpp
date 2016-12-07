@@ -126,6 +126,9 @@ Vehicle::Vehicle(Context* context)
     // wheel nodes
     m_vpNodeWheel.Clear();
 
+    // sound
+    playAccelerationSoundInAir_ = true;
+
 }
 
 //=============================================================================
@@ -306,6 +309,9 @@ void Vehicle::Init()
     shockSoundSrc_->SetSoundType(SOUND_EFFECT);
     shockSoundSrc_->SetGain(0.7f);
     shockSoundSrc_->SetDistanceAttenuation( 1.0f, 30.0f, 0.1f );
+
+    // acceleration sound while in air - most probably want this on
+    playAccelerationSoundInAir_ = false;
 }
 
 //=============================================================================
@@ -445,9 +451,16 @@ void Vehicle::FixedPostUpdate(float timeStep)
         }
         else
         {
-            if ( wheelRPM > upShiftRPM_ * MAX_WHEEL_RPM_AIR )
+            if (playAccelerationSoundInAir_)
             {
-                wheelRPM = upShiftRPM_ * Random(MIN_WHEEL_RPM_AIR, MAX_WHEEL_RPM_AIR);
+                if (wheelRPM > upShiftRPM_ * MAX_WHEEL_RPM_AIR)
+                {
+                    wheelRPM = upShiftRPM_ * Random(MIN_WHEEL_RPM_AIR, MAX_WHEEL_RPM_AIR);
+                }
+            }
+            else
+            {
+                wheelRPM = 0.0f;
             }
         }
 

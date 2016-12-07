@@ -173,6 +173,7 @@ protected:
     SharedPtr<SoundSource3D> engineSoundSrc_;
     SharedPtr<SoundSource3D> skidSoundSrc_;
     SharedPtr<SoundSource3D> shockSoundSrc_;
+    bool                     playAccelerationSoundInAir_;
 
     // wheel effects - skid track and particles
     SharedPtr<WheelTrackModel> wheelTrackList_[4];
