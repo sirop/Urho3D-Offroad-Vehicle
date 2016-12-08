@@ -57,8 +57,10 @@
 
 #define MIN_DOWN_FORCE          10.0f
 #define MAX_DOWN_FORCE          1e4f
-#define MIN_ANGULAR_VEL_LIMIT   (-10.0f)
 #define MAX_ANGULAR_VEL_LIMIT   10.0f
+#define LINEAR_VEL_LIMIT_MPH    140.0f
+#define VEL_TO_MPH              (3.6f/1.60934f)
+#define MAX_LINEAR_VEL_LIMIT    (LINEAR_VEL_LIMIT_MPH/VEL_TO_MPH)
 
 #define AUDIO_FIXED_FREQ_44K    44100.0f
 #define MIN_SHOCK_IMPACT_VEL    3.0f
@@ -357,7 +359,7 @@ void Vehicle::FixedUpdate(float timeStep)
 
     ApplyDownwardForce();
 
-    LimitAngularVelocity();
+    LimitLinearAndAngularVelocity();
 
     AutoCorrectPitchRoll();
 
@@ -630,13 +632,20 @@ void Vehicle::AutoCorrectPitchRoll()
     }
 }
 
-void Vehicle::LimitAngularVelocity()
+void Vehicle::LimitLinearAndAngularVelocity()
 {
+    // velocity limit
+    Vector3 linVel = raycastVehicle_->GetLinearVelocity();
+    if ( linVel.Length() > MAX_LINEAR_VEL_LIMIT )
+    {
+        raycastVehicle_->SetLinearVelocity( linVel.Normalized() * MAX_LINEAR_VEL_LIMIT );
+    }
+
     // angular velocity limiters
     Vector3 v3AngVel = raycastVehicle_->GetAngularVelocity();
-    v3AngVel.x_ = Clamp( v3AngVel.x_, MIN_ANGULAR_VEL_LIMIT, MAX_ANGULAR_VEL_LIMIT );
-    v3AngVel.y_ = Clamp( v3AngVel.y_, -m_fYAngularVelocity,  m_fYAngularVelocity );
-    v3AngVel.z_ = Clamp( v3AngVel.z_, MIN_ANGULAR_VEL_LIMIT, MAX_ANGULAR_VEL_LIMIT );
+    v3AngVel.x_ = Clamp( v3AngVel.x_, -MAX_ANGULAR_VEL_LIMIT,  MAX_ANGULAR_VEL_LIMIT );
+    v3AngVel.y_ = Clamp( v3AngVel.y_, -m_fYAngularVelocity,    m_fYAngularVelocity );
+    v3AngVel.z_ = Clamp( v3AngVel.z_, -MAX_ANGULAR_VEL_LIMIT,  MAX_ANGULAR_VEL_LIMIT );
     raycastVehicle_->SetAngularVelocity( v3AngVel );
 }
 

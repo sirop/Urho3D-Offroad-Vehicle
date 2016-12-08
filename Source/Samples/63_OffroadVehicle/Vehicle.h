@@ -106,7 +106,7 @@ protected:
     void AutoCorrectPitchRoll();
     void UpdateGear();
     void UpdateDrift();
-    void LimitAngularVelocity();
+    void LimitLinearAndAngularVelocity();
     void PostUpdateSound(float timeStep);
     void PostUpdateWheelEffects();
 
