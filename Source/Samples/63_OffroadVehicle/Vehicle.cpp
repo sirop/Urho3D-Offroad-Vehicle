@@ -814,6 +814,10 @@ void Vehicle::PostUpdateWheelEffects()
             {
                 wheelTrackList_[i]->AddStrip( pos2, ToVector3(whInfo.m_raycastInfo.m_contactNormalWS) );
             }
+            else
+            {
+                wheelTrackList_[i]->ClearStrip();
+            }
 
             // emit dust if moving
             if ( particleEmitter && !particleEmitter->IsEmitting() && curSpdMph > 2.0f)

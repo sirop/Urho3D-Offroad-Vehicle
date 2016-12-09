@@ -25,7 +25,7 @@
 #define INDECES_PER_STRIP       6
 #define STRIP_NORMAL_OFFSET     0.05f
 #define MIN_STRIP_LEN           0.4f
-#define MAX_STRIP_LEN           2.0f
+#define MAX_STRIP_LEN           4.0f
 #define MIN_LASTPOS_CNT         8
 #define SMALL_BIT               0.99f
 
