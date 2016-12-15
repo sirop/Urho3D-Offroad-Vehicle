@@ -206,6 +206,8 @@ void Vehicle::Init()
     raycastVehicle_->AddWheel(connectionPointCS0,wheelDirectionCS0,wheelAxleCS,m_fsuspensionRestLength,m_fwheelRadius,isFrontWheel);
 
     numWheels_ = raycastVehicle_->GetNumWheels();
+    prevWheelInContact_.Resize(numWheels_);
+
     for ( int i = 0; i < numWheels_; i++ )
     {
         btWheelInfo& wheel = raycastVehicle_->GetWheelInfo( i );
@@ -214,6 +216,8 @@ void Vehicle::Init()
         wheel.m_wheelsDampingCompression = m_fsuspensionCompression;
         wheel.m_frictionSlip = m_fwheelFriction;
         wheel.m_rollInfluence = m_frollInfluence;
+
+        prevWheelInContact_[i] = false;
 
         // side friction stiffness is different for front and rear wheels
         if (i < 2)
@@ -387,7 +391,13 @@ void Vehicle::FixedPostUpdate(float timeStep)
         // adjust wheel rotation based on acceleration
         if ( (curGearIdx_ == 0 || !whInfo.m_raycastInfo.m_isInContact ) && currentAcceleration_ > 0.0f )
         {
-            if ( whInfo.m_skidInfoCumulative > 0.05f )
+            // peel out on 1st gear
+            if ( curGearIdx_ == 0 && whInfo.m_skidInfoCumulative > 0.9f)
+            {
+                whInfo.m_skidInfoCumulative = 0.89f;
+            }
+
+            if (whInfo.m_skidInfoCumulative > 0.05f)
             {
                 whInfo.m_skidInfoCumulative -= 0.002f;
             }
@@ -742,6 +752,7 @@ void Vehicle::UpdateDrift()
 void Vehicle::PostUpdateSound(float timeStep)
 {
     int playSkidSound = 0;
+    bool playShockImpactSound = false;
 
     for ( int i = 0; i < numWheels_; ++i )
     {
@@ -754,7 +765,22 @@ void Vehicle::PostUpdateSound(float timeStep)
             {
                 playSkidSound++;
             }
+
+            // shock impact
+            if ( !prevWheelInContact_[i] )
+            {
+                Vector3 velAtWheel = raycastVehicle_->GetVelocityAtPoint( raycastVehicle_->GetWheelPositionLS(i) );
+                float downLinVel = velAtWheel.DotProduct( -Vector3::UP );
+
+                if ( downLinVel > MIN_SHOCK_IMPACT_VEL )
+                {
+                    playShockImpactSound = true;
+                }
+            }
         }
+
+        // update prev wheel in contact
+        prevWheelInContact_[i] = whInfo.m_raycastInfo.m_isInContact;
     }
 
     // -ideally, you want the engine sound to sound like it's at 10k rpm w/o any pitch adjustment, and 
@@ -765,16 +791,11 @@ void Vehicle::PostUpdateSound(float timeStep)
     engineSoundSrc_->SetFrequency(AUDIO_FIXED_FREQ_44K * curRPM_/rpmNormalizedForEnginePrototype);
 
     // shock impact when transitioning from partially off ground (or air borne) to landing
-    if ( prevWheelContacts_ <= 1 && numWheelContacts_ > 1 )
+    if ( prevWheelContacts_ <= 2 && playShockImpactSound )
     {
-        float f3DownLinVel = raycastVehicle_->GetLinearVelocity().DotProduct( -Vector3::UP );
-
-        if ( f3DownLinVel > MIN_SHOCK_IMPACT_VEL )
+        if ( !shockSoundSrc_->IsPlaying() )
         {
-            if ( !shockSoundSrc_->IsPlaying() )
-            {
-                shockSoundSrc_->Play(shockSnd_);
-            }
+            shockSoundSrc_->Play(shockSnd_);
         }
     }
 

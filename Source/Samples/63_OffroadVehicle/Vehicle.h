@@ -157,6 +157,7 @@ protected:
     int prevWheelContacts_;
     bool isBraking_;
     PODVector<float> gearShiftSpeed_;
+    PODVector<bool>  prevWheelInContact_;
 
     // gears
     float downShiftRPM_;
