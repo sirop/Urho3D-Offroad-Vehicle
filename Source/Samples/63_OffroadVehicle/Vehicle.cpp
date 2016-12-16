@@ -72,6 +72,9 @@
 #define MIN_WHEEL_RPM_AIR       0.89f
 #define MAX_WHEEL_RPM_AIR       0.90f
 
+#define MIN_SKID_VAL_AT_ZER0    0.8f
+#define MAX_REAR_SLIP           0.6f
+
 //=============================================================================
 //=============================================================================
 Vehicle::Vehicle(Context* context)
@@ -98,7 +101,7 @@ Vehicle::Vehicle(Context* context)
     m_fsuspensionStiffness = 20.0f;
     m_fsuspensionDamping = 2.0f;
     m_fsuspensionCompression = 5.0f;
-    m_frollInfluence = 0.01f;
+    m_frollInfluence = 0.1f;
     m_fsuspensionRestLength = 0.6f;
     m_fsideFrictionStiffness = 0.5f;
 
@@ -222,12 +225,12 @@ void Vehicle::Init()
         // side friction stiffness is different for front and rear wheels
         if (i < 2)
         {
-            wheel.m_sideFrictionStiffness = 1.0f;
+            wheel.m_sideFrictionStiffness = 0.9f;
         }
         else
         {
-            m_fRearSlip = 0.8f;
-            wheel.m_sideFrictionStiffness = 0.8f;
+            m_fRearSlip = MAX_REAR_SLIP;
+            wheel.m_sideFrictionStiffness = MAX_REAR_SLIP;
         }
     }
 
@@ -392,9 +395,9 @@ void Vehicle::FixedPostUpdate(float timeStep)
         if ( (curGearIdx_ == 0 || !whInfo.m_raycastInfo.m_isInContact ) && currentAcceleration_ > 0.0f )
         {
             // peel out on 1st gear
-            if ( curGearIdx_ == 0 && whInfo.m_skidInfoCumulative > 0.9f)
+            if ( curGearIdx_ == 0 && whInfo.m_skidInfoCumulative > MIN_SKID_VAL_AT_ZER0)
             {
-                whInfo.m_skidInfoCumulative = 0.89f;
+                whInfo.m_skidInfoCumulative = MIN_SKID_VAL_AT_ZER0;
             }
 
             if (whInfo.m_skidInfoCumulative > 0.05f)
@@ -716,7 +719,7 @@ void Vehicle::UpdateDrift()
 
     // set slip
     const float slipConditionValue = slipConditon3;
-    const float slipMax = 0.8f;
+    const float slipMax = MAX_REAR_SLIP;
     
     // for demo purpose, limit the drift speed to provide high speed steering experience w/o any drifting
     const float maxDriftSpeed = 70.0f;
@@ -770,7 +773,7 @@ void Vehicle::PostUpdateSound(float timeStep)
             if ( !prevWheelInContact_[i] )
             {
                 Vector3 velAtWheel = raycastVehicle_->GetVelocityAtPoint( raycastVehicle_->GetWheelPositionLS(i) );
-                float downLinVel = velAtWheel.DotProduct( -Vector3::UP );
+                float downLinVel = velAtWheel.DotProduct( Vector3::DOWN );
 
                 if ( downLinVel > MIN_SHOCK_IMPACT_VEL )
                 {
