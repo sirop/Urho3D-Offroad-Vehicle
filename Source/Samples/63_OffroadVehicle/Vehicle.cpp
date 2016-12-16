@@ -72,7 +72,7 @@
 #define MIN_WHEEL_RPM_AIR       0.89f
 #define MAX_WHEEL_RPM_AIR       0.90f
 
-#define MIN_SKID_VAL_AT_ZER0    0.8f
+#define MIN_PEELOUT_VAL_AT_ZER0 0.8f
 #define MAX_REAR_SLIP           0.6f
 
 //=============================================================================
@@ -395,9 +395,9 @@ void Vehicle::FixedPostUpdate(float timeStep)
         if ( (curGearIdx_ == 0 || !whInfo.m_raycastInfo.m_isInContact ) && currentAcceleration_ > 0.0f )
         {
             // peel out on 1st gear
-            if ( curGearIdx_ == 0 && whInfo.m_skidInfoCumulative > MIN_SKID_VAL_AT_ZER0)
+            if ( curGearIdx_ == 0 && whInfo.m_skidInfoCumulative > MIN_PEELOUT_VAL_AT_ZER0)
             {
-                whInfo.m_skidInfoCumulative = MIN_SKID_VAL_AT_ZER0;
+                whInfo.m_skidInfoCumulative = MIN_PEELOUT_VAL_AT_ZER0;
             }
 
             if (whInfo.m_skidInfoCumulative > 0.05f)
