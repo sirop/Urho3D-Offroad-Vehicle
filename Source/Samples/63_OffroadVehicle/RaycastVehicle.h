@@ -79,6 +79,12 @@ public:
 	}
 
     Vector3 GetCompoundLocalExtents() const;
+    Vector3 GetCompooundLocalExtentsCenter() const;
+    Vector3 GetCompoundLocalAabbMin() const;
+    Vector3 GetCompoundLocalAabbMax() const;
+
+    void CompoundScaleLocalAabbMin(const Vector3& scale);
+    void CompoundScaleLocalAabbMax(const Vector3& scale);
 
 protected:
     /// Create the rigid body, or re-add to the physics world with changed flags. Calls UpdateMass().

@@ -182,7 +182,11 @@ void Vehicle::Init()
     hullObject->SetMaterial(cache->GetResource<Material>("Offroad/Models/Materials/offroadVehicle.xml"));
     hullObject->SetCastShadows(true);
 
+    // set convex hull and resize local AABB.Y size
     hullColShape->SetConvexHull(vehModel);
+    raycastVehicle_->CompoundScaleLocalAabbMin(Vector3(1,0.5f,1));
+    raycastVehicle_->CompoundScaleLocalAabbMax(Vector3(1,0.5f,1));
+
     bool isFrontWheel=true;
     Vector3 wheelDirectionCS0(0,-1,0);
     Vector3 wheelAxleCS(-1,0,0);
@@ -869,10 +873,14 @@ void Vehicle::DebugDraw(const Color &color)
     {
         // draw compound shape bounding box (the inertia bbox)
         Vector3 localExtents = raycastVehicle_->GetCompoundLocalExtents();
+        Vector3 localCenter  = raycastVehicle_->GetCompooundLocalExtentsCenter();
         BoundingBox bbox(-localExtents, localExtents);
+
         btTransform trans;
         raycastVehicle_->getWorldTransform(trans);
         Vector3 posWS = ToVector3(trans.getOrigin());
+        Vector3 centerWS = ToQuaternion(trans.getRotation()) * localCenter;
+        posWS += centerWS;
         Matrix3x4 mat34(posWS, ToQuaternion(trans.getRotation()), 1.0f);
 
         dbgRenderer->AddBoundingBox(bbox, mat34, color);

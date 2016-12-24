@@ -203,7 +203,51 @@ Vector3 RaycastVehicle::GetForwardVector() const
 
 Vector3 RaycastVehicle::GetCompoundLocalExtents() const
 {
-    return ToVector3(GetCompoundShape()->getLocalHalfExtents());
+    const btVector3& minAabb = GetCompoundShape()->getLocalAabbMin();
+    const btVector3& maxAabb = GetCompoundShape()->getLocalAabbMax();
+
+    return ToVector3(btScalar(0.5)*(maxAabb-minAabb));
 }
+
+Vector3 RaycastVehicle::GetCompooundLocalExtentsCenter() const
+{
+    const btVector3& minAabb = GetCompoundShape()->getLocalAabbMin();
+    const btVector3& maxAabb = GetCompoundShape()->getLocalAabbMax();
+
+    return ToVector3(btScalar(0.5)*(maxAabb+minAabb));
+}
+
+Vector3 RaycastVehicle::GetCompoundLocalAabbMin() const
+{
+    const btVector3& minAabb = GetCompoundShape()->getLocalAabbMin();
+    return ToVector3(minAabb);
+}
+
+Vector3 RaycastVehicle::GetCompoundLocalAabbMax() const
+{
+    const btVector3& maxAabb = GetCompoundShape()->getLocalAabbMax();
+    return ToVector3(maxAabb);
+}
+
+void RaycastVehicle::CompoundScaleLocalAabbMin(const Vector3& scale)
+{
+    btVector3& minAabb = GetCompoundShape()->getLocalAabbMin();
+    Vector3 aabb = ToVector3(minAabb);
+    aabb.x_ *= scale.x_;
+    aabb.y_ *= scale.y_;
+    aabb.z_ *= scale.z_;
+    minAabb = ToBtVector3(aabb);
+}
+
+void RaycastVehicle::CompoundScaleLocalAabbMax(const Vector3& scale)
+{
+    btVector3& maxAabb = GetCompoundShape()->getLocalAabbMax();
+    Vector3 aabb = ToVector3(maxAabb);
+    aabb.x_ *= scale.x_;
+    aabb.y_ *= scale.y_;
+    aabb.z_ *= scale.z_;
+    maxAabb = ToBtVector3(aabb);
+}
+
 
 
