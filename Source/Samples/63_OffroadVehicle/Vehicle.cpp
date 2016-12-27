@@ -185,8 +185,8 @@ void Vehicle::Init()
     // set convex hull and resize local AABB.Y size
     Model *vehColModel = cache->GetResource<Model>("Offroad/Models/vehCollision.mdl");
     hullColShape->SetConvexHull(vehColModel);
-    raycastVehicle_->CompoundScaleLocalAabbMin(Vector3(0.8f, 0.5f, 1.0f));
-    raycastVehicle_->CompoundScaleLocalAabbMax(Vector3(0.8f, 0.5f, 1.0f));
+    raycastVehicle_->CompoundScaleLocalAabbMin(Vector3(0.7f, 0.5f, 1.0f));
+    raycastVehicle_->CompoundScaleLocalAabbMax(Vector3(0.7f, 0.5f, 1.0f));
 
     bool isFrontWheel=true;
     Vector3 wheelDirectionCS0(0,-1,0);
