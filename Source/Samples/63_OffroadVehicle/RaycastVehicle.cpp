@@ -56,6 +56,9 @@ RaycastVehicle::~RaycastVehicle()
     }
     if (raycastVehicle_)
     {
+        btDynamicsWorld *pbtDynWorld = (btDynamicsWorld*)GetPhysicsWorld()->GetWorld();
+        pbtDynWorld->removeVehicle(raycastVehicle_);
+
         delete raycastVehicle_;
         raycastVehicle_ = NULL;
     }
