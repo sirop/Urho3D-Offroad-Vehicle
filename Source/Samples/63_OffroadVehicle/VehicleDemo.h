@@ -71,6 +71,11 @@ private:
 
     WeakPtr<Text>  textKmH_;
 
+    // smooth step
+    Quaternion     vehicleRot_;
+    Vector3        targetCameraPos_;
+    float          springVelocity_;
+
     // dbg
     WeakPtr<Text>  textStatus_;
     Timer          fpsTimer_;

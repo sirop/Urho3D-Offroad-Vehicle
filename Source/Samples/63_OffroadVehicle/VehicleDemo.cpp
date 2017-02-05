@@ -51,6 +51,7 @@
 #include "Vehicle.h"
 #include "RaycastVehicle.h"
 #include "WheelTrackModel.h"
+#include "SmoothStep.h"
 
 #include <Urho3D/DebugNew.h>
 
@@ -68,6 +69,7 @@ URHO3D_DEFINE_APPLICATION_MAIN(VehicleDemo)
 VehicleDemo::VehicleDemo(Context* context) :
     Sample(context)
     , drawDebug_(false)
+    , springVelocity_(0.0f)
 {
     // Register factory and attributes for the Vehicle component so it can be created via CreateComponent, and loaded / saved
     Vehicle::RegisterObject(context);
@@ -170,6 +172,13 @@ void VehicleDemo::CreateVehicle()
     // Create the vehicle logic component
     vehicle_ = vehicleNode->CreateComponent<Vehicle>();
     vehicle_->Init();
+
+    // smooth step
+    vehicleRot_ = vehicleNode->GetRotation();
+    Quaternion dir(vehicleRot_.YawAngle(), Vector3::UP);
+    dir = dir * Quaternion(vehicle_->controls_.yaw_, Vector3::UP);
+    dir = dir * Quaternion(vehicle_->controls_.pitch_, Vector3::RIGHT);
+    targetCameraPos_ = vehicleNode->GetPosition() - dir * Vector3(0.0f, 0.0f, CAMERA_DISTANCE);
 }
 
 void VehicleDemo::InitAudio()
@@ -357,15 +366,30 @@ void VehicleDemo::HandlePostUpdate(StringHash eventType, VariantMap& eventData)
     if (!vehicle_)
         return;
 
+    using namespace Update;
+    float timeStep = eventData[P_TIMESTEP].GetFloat();
+
     Node* vehicleNode = vehicle_->GetNode();
 
+    // smooth step
+    const float rotLerpRate = 10.0f;
+    const float maxVel = 50.0f;
+    const float damping = 0.2f;
+
     // Physics update has completed. Position camera behind vehicle
-    Quaternion dir(vehicleNode->GetRotation().YawAngle(), Vector3::UP);
+    vehicleRot_ = SmoothStepAngle(vehicleRot_, vehicleNode->GetRotation(), timeStep * rotLerpRate);
+    Quaternion dir(vehicleRot_.YawAngle(), Vector3::UP);
     dir = dir * Quaternion(vehicle_->controls_.yaw_, Vector3::UP);
     dir = dir * Quaternion(vehicle_->controls_.pitch_, Vector3::RIGHT);
 
-    Vector3 cameraTargetPos = vehicleNode->GetPosition() - dir * Vector3(0.0f, 0.0f, CAMERA_DISTANCE);
-    Vector3 cameraStartPos = vehicleNode->GetPosition();
+    Vector3 vehiclePos = vehicleNode->GetPosition();
+    float curDist = (vehiclePos - targetCameraPos_).Length();
+
+    curDist = SpringDamping(curDist, CAMERA_DISTANCE, springVelocity_, damping, maxVel, timeStep);
+    targetCameraPos_ = vehiclePos - dir * Vector3(0.0f, 0.0f, curDist);
+
+    Vector3 cameraTargetPos = targetCameraPos_;
+    Vector3 cameraStartPos = vehiclePos;
 
     // Raycast camera against static objects (physics collision mask 2)
     // and move it closer to the vehicle if something in between
